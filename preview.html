@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      width: 200px;
+      padding: 15px;
+      font-family: Arial, sans-serif;
+      margin: 0;
+    }
+    
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 15px;
+    }
+    
+    .toggle-label {
+      font-size: 14px;
+      font-weight: bold;
+    }
+    
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 48px;
+      height: 24px;
+    }
+    
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: .4s;
+      border-radius: 24px;
+    }
+    
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+    
+    input:checked + .slider {
+      background-color: #5865F2;
+    }
+    
+    input:checked + .slider:before {
+      transform: translateX(24px);
+    }
+    
+    .footer {
+      text-align: center;
+      font-size: 11px;
+      color: #666;
+      border-top: 1px solid #eee;
+      padding-top: 10px;
+    }
+    
+    .footer a {
+      color: #5865F2;
+      text-decoration: none;
+    }
+    
+    .footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="toggle-container">
+    <span class="toggle-label">Presence</span>
+    <label class="switch">
+      <input type="checkbox" id="toggleSwitch" checked>
+      <span class="slider"></span>
+    </label>
+  </div>
+  
+  <div class="footer">
+    Made by <a href="https://youtube.com/@MalikHw47" target="_blank">MalikHw47</a>
+  </div>
+  
+  <script>
+    const toggle = document.getElementById('toggleSwitch');
+    
+    // Detect browser API
+    const browserAPI = typeof chrome !== 'undefined' && chrome.runtime ? chrome : browser;
+    
+    // Load current state
+    browserAPI.runtime.sendMessage({ action: 'getState' }, (response) => {
+      if (response) {
+        toggle.checked = response.enabled;
+      }
+    });
+    
+    // Handle toggle
+    toggle.addEventListener('change', () => {
+      browserAPI.runtime.sendMessage({
+        action: 'toggle',
+        enabled: toggle.checked
+      });
+    });
+  </script>
+</body>
+</html>
