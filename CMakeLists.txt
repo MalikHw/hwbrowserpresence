@@ -10,7 +10,7 @@ if(WIN32)
     # Windows: use provided lib and header
     target_include_directories(hwbrowserpresence-bridge PRIVATE ${CMAKE_SOURCE_DIR})
     target_link_libraries(hwbrowserpresence-bridge 
-        ${CMAKE_SOURCE_DIR}/discord-rpc-windows.lib
+        ${CMAKE_SOURCE_DIR}/rpc-windows.lib
         ws2_32 
         shell32
     )
@@ -24,7 +24,7 @@ else()
     # Linux: use provided .so and header
     target_include_directories(hwbrowserpresence-bridge PRIVATE ${CMAKE_SOURCE_DIR})
     target_link_libraries(hwbrowserpresence-bridge 
-        ${CMAKE_SOURCE_DIR}/discord-rpc-linux.so
+        ${CMAKE_SOURCE_DIR}/rpc-linux.so
         pthread
         dl
     )
