@@ -1,9 +1,14 @@
-#include "discord_rpc.h"
 #include <string>
 #include <thread>
 #include <mutex>
 #include <ctime>
 #include <iostream>
+
+#ifdef _WIN32
+#include "discord-rpc-windows.h"
+#else
+#include "discord-rpc-linux.h"
+#endif
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -31,6 +36,7 @@
 std::mutex presenceMutex;
 std::string currentTitle = "";
 std::string currentDomain = "";
+std::string currentFavicon = "";
 bool running = true;
 
 #ifdef _WIN32
@@ -111,7 +117,13 @@ void UpdateDiscordPresence() {
     presence.details = currentTitle.c_str();
     presence.state = currentDomain.c_str();
     presence.startTimestamp = time(nullptr);
-    presence.largeImageKey = "browser";
+    
+    // Use favicon as large image if available
+    if (!currentFavicon.empty()) {
+        presence.largeImageKey = currentFavicon.c_str();
+    } else {
+        presence.largeImageKey = "browser";
+    }
     presence.largeImageText = currentDomain.c_str();
     
     Discord_UpdatePresence(&presence);
@@ -140,6 +152,7 @@ void HandleWebSocketMessage(const std::string& data) {
     // Simple JSON parsing for our specific format
     size_t titlePos = data.find("\"title\":\"");
     size_t domainPos = data.find("\"domain\":\"");
+    size_t faviconPos = data.find("\"favicon\":\"");
     
     if (titlePos != std::string::npos && domainPos != std::string::npos) {
         titlePos += 9;
@@ -152,6 +165,17 @@ void HandleWebSocketMessage(const std::string& data) {
             std::lock_guard<std::mutex> lock(presenceMutex);
             currentTitle = data.substr(titlePos, titleEnd - titlePos);
             currentDomain = data.substr(domainPos, domainEnd - domainPos);
+            
+            // Extract favicon if present
+            if (faviconPos != std::string::npos) {
+                faviconPos += 11;
+                size_t faviconEnd = data.find("\"", faviconPos);
+                if (faviconEnd != std::string::npos) {
+                    currentFavicon = data.substr(faviconPos, faviconEnd - faviconPos);
+                }
+            } else {
+                currentFavicon = "";
+            }
             
             UpdateDiscordPresence();
         }
