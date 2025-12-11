@@ -27,7 +27,7 @@ jobs:
         run: |
           mkdir windows-package
           copy hwbrowserpresence-windows-bridge.exe windows-package\
-          copy discord-rpc-windows.dll windows-package\ 2>nul || echo "DLL not found, skipping"
+          copy discord-rpc.dll windows-package\ 2>nul || echo "DLL not found, skipping"
           cd windows-package
           Compress-Archive -Path * -DestinationPath ..\hwbrowserpresence-windows-bridge.zip
         shell: powershell
