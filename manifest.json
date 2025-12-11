@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "HwBrowserPresence",
+  "version": "1.0.0",
+  "description": "Show your browser activity on Discord (PreMiD but no bloat)",
+  "permissions": [
+    "tabs",
+    "nativeMessaging"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "script.js"
+  },
+  "action": {
+    "default_popup": "preview.html"
+  },
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  }
+}
