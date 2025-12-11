@@ -8,29 +8,14 @@ on:
       - main
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [windows-latest, ubuntu-latest]
+  build-windows:
+    runs-on: windows-latest
+    continue-on-error: true
     
     steps:
       - uses: actions/checkout@v3
-        with:
-          submodules: recursive
       
-      - name: Install dependencies (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake build-essential
-      
-      - name: Clone Discord RPC
-        run: |
-          git clone https://github.com/discord/discord-rpc.git
-      
-      - name: Build Bridge (Windows)
-        if: matrix.os == 'windows-latest'
+      - name: Build Bridge
         run: |
           mkdir build
           cd build
@@ -38,8 +23,32 @@ jobs:
           cmake --build . --config Release
           copy Release\hwbrowserpresence-windows-bridge.exe ..\hwbrowserpresence-windows-bridge.exe
       
-      - name: Build Bridge (Linux)
-        if: matrix.os == 'ubuntu-latest'
+      - name: Package Windows Bridge with DLL
+        run: |
+          mkdir windows-package
+          copy hwbrowserpresence-windows-bridge.exe windows-package\
+          copy discord-rpc-windows.dll windows-package\ 2>nul || echo "DLL not found, skipping"
+          cd windows-package
+          Compress-Archive -Path * -DestinationPath ..\hwbrowserpresence-windows-bridge.zip
+        shell: powershell
+      
+      - name: Upload Windows Bridge
+        uses: actions/upload-artifact@v3
+        with:
+          name: windows-bridge
+          path: hwbrowserpresence-windows-bridge.zip
+
+  build-linux:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake build-essential
+      
+      - name: Build Bridge
         run: |
           mkdir build
           cd build
@@ -48,31 +57,32 @@ jobs:
           cp hwbrowserpresence-linux-bridge ../hwbrowserpresence-linux-bridge
           chmod +x ../hwbrowserpresence-linux-bridge
       
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
+      - name: Upload Linux Bridge
+        uses: actions/upload-artifact@v3
         with:
-          name: bridge-${{ matrix.os }}
-          path: |
-            hwbrowserpresence-windows-bridge.exe
-            hwbrowserpresence-linux-bridge
+          name: linux-bridge
+          path: hwbrowserpresence-linux-bridge
   
-  package:
-    needs: build
+  package-extensions:
     runs-on: ubuntu-latest
+    needs: [build-windows, build-linux]
+    if: always()
     
     steps:
       - uses: actions/checkout@v3
       
-      - name: Download Windows Bridge
+      - name: Download Windows Bridge (if available)
         uses: actions/download-artifact@v3
+        continue-on-error: true
         with:
-          name: bridge-windows-latest
+          name: windows-bridge
           path: ./artifacts
       
-      - name: Download Linux Bridge
+      - name: Download Linux Bridge (if available)
         uses: actions/download-artifact@v3
+        continue-on-error: true
         with:
-          name: bridge-ubuntu-latest
+          name: linux-bridge
           path: ./artifacts
       
       - name: Get version from manifest
@@ -105,15 +115,19 @@ jobs:
           cd firefox-extension
           zip -r ../hwbrowserpresence-firefox.zip .
       
+      - name: Prepare Release Files
+        run: |
+          mkdir -p release-files
+          cp hwbrowserpresence-chrome.zip release-files/ || true
+          cp hwbrowserpresence-firefox.zip release-files/ || true
+          cp artifacts/hwbrowserpresence-windows-bridge.zip release-files/ 2>/dev/null || echo "Windows bridge not available"
+          cp artifacts/hwbrowserpresence-linux-bridge release-files/ 2>/dev/null || echo "Linux bridge not available"
+      
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ steps.version.outputs.VERSION }}
           name: Release v${{ steps.version.outputs.VERSION }}
-          files: |
-            hwbrowserpresence-chrome.zip
-            hwbrowserpresence-firefox.zip
-            artifacts/hwbrowserpresence-windows-bridge.exe
-            artifacts/hwbrowserpresence-linux-bridge
+          files: release-files/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
