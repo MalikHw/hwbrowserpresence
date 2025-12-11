@@ -1,0 +1,119 @@
+name: Build and Release
+
+on:
+  push:
+    paths:
+      - 'manifest.json'
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      
+      - name: Install dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential
+      
+      - name: Clone Discord RPC
+        run: |
+          git clone https://github.com/discord/discord-rpc.git
+      
+      - name: Build Bridge (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          mkdir build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+          cmake --build . --config Release
+          copy Release\hwbrowserpresence-windows-bridge.exe ..\hwbrowserpresence-windows-bridge.exe
+      
+      - name: Build Bridge (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          mkdir build
+          cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+          cmake --build . --config Release
+          cp hwbrowserpresence-linux-bridge ../hwbrowserpresence-linux-bridge
+          chmod +x ../hwbrowserpresence-linux-bridge
+      
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: bridge-${{ matrix.os }}
+          path: |
+            hwbrowserpresence-windows-bridge.exe
+            hwbrowserpresence-linux-bridge
+  
+  package:
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Download Windows Bridge
+        uses: actions/download-artifact@v3
+        with:
+          name: bridge-windows-latest
+          path: ./artifacts
+      
+      - name: Download Linux Bridge
+        uses: actions/download-artifact@v3
+        with:
+          name: bridge-ubuntu-latest
+          path: ./artifacts
+      
+      - name: Get version from manifest
+        id: version
+        run: echo "VERSION=$(jq -r .version manifest.json)" >> $GITHUB_OUTPUT
+      
+      - name: Sync Firefox manifest version
+        run: |
+          VERSION=$(jq -r .version manifest.json)
+          jq --arg ver "$VERSION" '.version = $ver' manifest-firefox.json > manifest-firefox.json.tmp
+          mv manifest-firefox.json.tmp manifest-firefox.json
+      
+      - name: Package Chrome Extension
+        run: |
+          mkdir -p chrome-extension
+          cp manifest.json chrome-extension/
+          cp script.js chrome-extension/
+          cp preview.html chrome-extension/
+          cp icon.png chrome-extension/ || echo "Warning: icon.png not found"
+          cd chrome-extension
+          zip -r ../hwbrowserpresence-chrome.zip .
+      
+      - name: Package Firefox Extension
+        run: |
+          mkdir -p firefox-extension
+          cp manifest-firefox.json firefox-extension/manifest.json
+          cp script-firefox.js firefox-extension/script.js
+          cp preview.html firefox-extension/
+          cp icon.png firefox-extension/ || echo "Warning: icon.png not found"
+          cd firefox-extension
+          zip -r ../hwbrowserpresence-firefox.zip .
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.VERSION }}
+          name: Release v${{ steps.version.outputs.VERSION }}
+          files: |
+            hwbrowserpresence-chrome.zip
+            hwbrowserpresence-firefox.zip
+            artifacts/hwbrowserpresence-windows-bridge.exe
+            artifacts/hwbrowserpresence-linux-bridge
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
